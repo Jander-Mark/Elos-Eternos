@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elos Eternos</title>
+    <style>
+        :root {
+            --cor-fundo: #121212;
+            --cor-texto: #e0e0e0;
+            --cor-caixa: #1e1e1e;
+            --cor-borda: #333;
+            --cor-selecionado: #5a9bd3;
+            --cor-texto-selecionado: #ffffff;
+            --cor-derrota: #e74c3c;
+            --cor-sombra: rgba(0, 0, 0, 0.2);
+
+            --grupo1: #f3c83d; /* Amarelo */
+            --grupo2: #5cb85c; /* Verde */
+            --grupo3: #5bc0de; /* Azul */
+            --grupo4: #9b59b6; /* Roxo */
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--cor-fundo);
+            color: var(--cor-texto);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .game-container {
+            width: 100%;
+            max-width: 650px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            color: var(--cor-texto);
+            margin-bottom: 20px;
+            text-shadow: 0 2px 4px var(--cor-sombra);
+        }
+        
+        /* === LAYOUT DE INFORMAÇÕES APRIMORADO === */
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch;
+            width: 100%;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+        
+        #stats-display {
+            display: flex;
+            gap: 10px;
+            flex-grow: 1;
+        }
+
+        .info-card {
+            background-color: var(--cor-caixa);
+            padding: 8px 12px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--cor-borda);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            flex: 1;
+        }
+
+        .info-card .label {
+            font-size: 0.75rem; /* Ajustado para caber melhor */
+            color: #aaa;
+            display: block;
+            text-transform: uppercase;
+        }
+
+        .info-card .value {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: var(--cor-texto);
+        }
+        
+        #mistakes-container .value { color: var(--cor-selecionado); }
+        #stats-losses.value { color: var(--cor-derrota); }
+
+        .found-groups {
+            width: 100%; margin-bottom: 20px; display: flex;
+            flex-direction: column; gap: 10px;
+        }
+        .found-group {
+            padding: 18px; border-radius: 8px; text-align: center;
+            opacity: 0; transform: translateY(20px);
+            animation: slideUpFadeIn 0.6s ease-out forwards; color: #111;
+        }
+        .found-group strong { display: block; font-size: 1.2rem; margin-bottom: 5px; }
+        .found-group.level-1 { background-color: var(--grupo1); }
+        .found-group.level-2 { background-color: var(--grupo2); }
+        .found-group.level-3 { background-color: var(--grupo3); }
+        .found-group.level-4 { background-color: var(--grupo4); }
+
+        @keyframes slideUpFadeIn { to { opacity: 1; transform: translateY(0); } }
+
+        #game-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 12px; width: 100%; margin-bottom: 25px;
+            transition: all 0.5s ease;
+        }
+        .word-btn {
+            width: 100%; aspect-ratio: 2 / 1; font-size: clamp(0.9rem, 2.5vw, 1.2rem);
+            font-weight: bold; text-transform: uppercase; background-color: var(--cor-caixa);
+            border: 1px solid var(--cor-borda); border-radius: 8px; cursor: pointer;
+            transition: all 0.3s ease; color: var(--cor-texto); user-select: none;
+            text-align: center; display: flex; justify-content: center; align-items: center;
+        }
+        .word-btn:hover { transform: scale(1.05); border-color: var(--cor-selecionado); }
+        .word-btn.selected {
+            background-color: var(--cor-selecionado); color: var(--cor-texto-selecionado);
+            border-color: var(--cor-selecionado); transform: scale(1.05);
+        }
+        .word-btn.guessed { opacity: 0; pointer-events: none; transform: scale(0.9); }
+        
+        .game-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; }
+        .control-btn {
+            padding: 12px 25px; font-size: 1rem; font-weight: bold; border-radius: 8px;
+            cursor: pointer; border: none; transition: background-color 0.2s, transform 0.2s;
+        }
+        .control-btn:hover { transform: translateY(-2px); }
+        #deselect-btn { background-color: #7f8c8d; color: white; }
+        #reset-stats-btn { background-color: #c0392b; color: white; }
+        .game-container.shake { animation: shake 0.5s; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7);
+            display: flex; justify-content: center; align-items: center; z-index: 100;
+            visibility: hidden; opacity: 0; transition: visibility 0s 0.3s, opacity 0.3s ease;
+        }
+        #overlay.show { visibility: visible; opacity: 1; transition: opacity 0.3s ease; }
+        .modal {
+            background-color: var(--cor-caixa); padding: 30px; border-radius: 12px; text-align: center;
+            transform: scale(0.8); transition: transform 0.3s ease; border: 1px solid var(--cor-borda);
+            width: 90%; max-width: 600px;
+        }
+        #overlay.show .modal { transform: scale(1); }
+        .modal h2 { margin-top: 0; font-size: 2rem; color: var(--cor-texto); }
+        .modal p { font-size: 1.2rem; margin-bottom: 20px; color: #bbb; }
+        #modal-results { display: flex; flex-direction: column; gap: 10px; margin-bottom: 25px; }
+        #play-again-btn { background-color: var(--cor-selecionado); color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="game-container" id="game-container">
+        <h1>Elos Eternos</h1>
+        
+        <div class="game-info">
+            <div id="stats-display">
+                <div class="info-card">
+                    <span class="label">JOGOS</span>
+                    <span class="value" id="stats-played">0</span>
+                </div>
+                <div class="info-card">
+                    <span class="label">VITÓRIAS</span>
+                    <span class="value" id="stats-won">0</span>
+                </div>
+                <div class="info-card">
+                    <span class="label">DERROTAS</span>
+                    <span class="value" id="stats-losses">0</span>
+                </div>
+                <div class="info-card">
+                    <span class="label">TAXA %</span>
+                    <span class="value" id="stats-rate">0</span>
+                </div>
+            </div>
+            <div class="info-card" id="mistakes-container">
+                <span class="label">ERROS</span>
+                <span class="value" id="mistakes-left">10</span>
+            </div>
+        </div>
+
+        <div class="found-groups" id="found-groups"></div>
+        <div id="game-grid"></div>
+        <div class="game-controls">
+            <button id="deselect-btn" class="control-btn">Desselecionar Todos</button>
+            <button id="reset-stats-btn" class="control-btn">Resetar Estatísticas</button>
+        </div>
+    </div>
+    
+    <div id="overlay">
+        <div class="modal">
+            <h2 id="modal-title"></h2>
+            <p id="modal-message"></p>
+            <div id="modal-results"></div>
+            <button id="play-again-btn" class="control-btn">Jogar Novamente</button>
+        </div>
+    </div>
+
+    <script>
+        const wordBank = {
+            // Natureza e Biologia
+            'FRUTAS': ['MAÇÃ', 'BANANA', 'UVA', 'LARANJA', 'MORANGO', 'ABACAXI', 'MANGA', 'PERA', 'KIWI', 'MELANCIA'],
+            'CORES': ['VERMELHO', 'AZUL', 'VERDE', 'AMARELO', 'ROXO', 'BRANCO', 'PRETO', 'CINZA', 'LARANJA', 'MARROM'],
+            'ANIMAIS DA FAZENDA': ['VACA', 'PORCO', 'GALINHA', 'CAVALO', 'OVELHA', 'CABRA', 'PATO', 'COELHO', 'PERU', 'BURRO'],
+            'ANIMAIS MARINHOS': ['BALEIA', 'GOLFINHO', 'TUBARÃO', 'POLVO', 'LULA', 'SIRI', 'TARTARUGA', 'FOCA', 'PEIXE-PALHAÇO', 'CAVALO-MARINHO'],
+            'FLORES': ['ROSA', 'CRAVO', 'TULIPA', 'ORQUÍDEA', 'MARGARIDA', 'GIRASSOL', 'LÍRIO', 'VIOLETA', 'JASMIM', 'BEGÔNIA'],
+            'ELEMENTOS DA NATUREZA': ['FOGO', 'ÁGUA', 'TERRA', 'AR', 'MADEIRA', 'PEDRA', 'METAL', 'GELO', 'AREIA', 'NUVEM'],
+            'FENÔMENOS CLIMÁTICOS': ['CHUVA', 'SOL', 'VENTO', 'NEVE', 'NUVEM', 'TEMPESTADE', 'NÉVOA', 'GEADA', 'GRANIZO', 'FURACÃO'],
+            'ÁRVORES': ['IPE', 'JACARANDÁ', 'PINHEIRO', 'CARVALHO', 'MOGNO', 'EUCALIPTO', 'CEREJEIRA', 'PAU-BRASIL'],
+            'CÃES DE RAÇA': ['PASTOR', 'BULDOGUE', 'POODLE', 'LABRADOR', 'GOLDEN', 'CHIHUAHUA', 'BEAGLE', 'PUG'],
+            'GATOS DE RAÇA': ['SIAMÊS', 'PERSA', 'MAINE COON', 'SPHYNX', 'BENGAL', 'RAGDOLL', 'ANGORÁ', 'SCOTTISH'],
+            'DINOSSAUROS': ['TIRANOSSAURO', 'ESTEGOSSAURO', 'TRICERÁTOPO', 'VELOCIRAPTOR', 'BRAQUIOSSAURO', 'PTERODÁTILO'],
+            'INSETOS': ['FORMIGA', 'MOSCA', 'BARATA', 'ABELHA', 'BESOURO', 'JOANINHA', 'LIBÉLULA', 'PERNILONGO'],
+
+            // Objetos e Cotidiano
+            'OBJETOS DE ESCRITÓRIO': ['CANETA', 'LÁPIS', 'PAPEL', 'CLIPE', 'GRAMPEADOR', 'TESOURA', 'RÉGUA', 'BORRACHA', 'LIVRO', 'CADERNO'],
+            'FERRAMENTAS': ['MARTELO', 'SERROTE', 'CHAVE', 'ALICATE', 'FURADEIRA', 'SERRA', 'PREGO', 'PARAFUSO', 'LIXA', 'TRENA'],
+            'MÓVEIS DE CASA': ['CAMA', 'MESA', 'SOFÁ', 'CADEIRA', 'ARMÁRIO', 'ESTANTE', 'CÔMODA', 'GAVETA', 'PRATELEIRA', 'BANCO'],
+            'VESTUÁRIO': ['CAMISA', 'CALÇA', 'SAIA', 'VESTIDO', 'BLUSA', 'JAQUETA', 'MEIA', 'SAPATO', 'CHAPÉU', 'CACHECOL'],
+            'OBJETOS DE COZINHA': ['PANELA', 'GARFO', 'FACA', 'COLHER', 'PRATO', 'COPO', 'XÍCARA', 'TIGELA', 'FRIGIDEIRA', 'RALADOR'],
+            'PARTES DE UM CARRO': ['MOTOR', 'PNEU', 'VOLANTE', 'FREIO', 'FAROL', 'CHASSI', 'PORTA', 'PARA-BRISA', 'CÂMBIO', 'ACELERADOR'],
+            'ITENS DE BANHEIRO': ['SABONETE', 'XAMPU', 'TOALHA', 'ESCOVA', 'PASTA', 'ESPELHO', 'CHUVEIRO', 'PIA'],
+            'TIPOS DE EMBALAGEM': ['CAIXA', 'GARRAFA', 'LATA', 'SACO', 'POTE', 'ENVELOPE', 'TUBO', 'BLISTER'],
+            'COISAS EM UM CASTELO': ['TORRE', 'FOSSO', 'MURALHA', 'PONTE', 'CALABOUÇO', 'TRONO', 'SALÃO', 'CATAPULTA'],
+            'INSTRUMENTOS DE MEDIÇÃO': ['RÉGUA', 'BALANÇA', 'TERMÔMETRO', 'CRONÔMETRO', 'COMPASSO', 'MANÔMETRO', 'VOLTÍMETRO'],
+
+            // Comida e Bebida
+            'BEBIDAS': ['ÁGUA', 'SUCO', 'LEITE', 'CHÁ', 'REFRIGERANTE', 'VINHO', 'CERVEJA', 'IOGURTE', 'VITAMINA', 'LIMONADA'],
+            'DOCES': ['BOLO', 'PUDIM', 'BRIGADEIRO', 'QUINDIM', 'SORVETE', 'CHOCOLATE', 'BOMBOM', 'PAVÊ', 'MOUSSE', 'GELATINA'],
+            'INGREDIENTES DE PIZZA': ['QUEIJO', 'TOMATE', 'ORÉGANO', 'AZEITONA', 'MANJERICÃO', 'CALABRESA', 'CEBOLA', 'PIMENTÃO', 'MILHO', 'CHAMPIGNON'],
+            'TERMOS DE CAFETERIA': ['ESPRESSO', 'CAPPUCCINO', 'LATTE', 'MOCHA', 'MACCHIATO', 'AMERICANO', 'RISTRETTO', 'CAFÉ', 'FRAPÊ', 'FILTRADO'],
+            'TIPOS DE PÃO': ['BAGUETE', 'CIABATTA', 'BRIOCHE', 'INTEGRAL', 'DE FORMA', 'FRANCÊS', 'AUSTRALIANO', 'SÍRIO'],
+            'TIPOS DE QUEIJO': ['MUSSARELA', 'PRATO', 'CHEDDAR', 'GORGONZOLA', 'BRIE', 'PROVOLONE', 'PARMESÃO', 'MINAS'],
+            'MARCAS DE CHOCOLATE': ['NESTLÉ', 'GAROTO', 'LACTA', 'CACAU SHOW', 'LINDT', 'HERSHEYS', 'MILKA', 'FERRERO'],
+            'ERVAS E ESPECIARIAS': ['MANJERICÃO', 'ORÉGANO', 'ALECRIM', 'SALSINHA', 'COENTRO', 'PIMENTA', 'CANELA', 'CRAVO'],
+            'TIPOS DE MASSA': ['ESPAGUETE', 'PENNE', 'PARAFUSO', 'LASANHA', 'RAVIOLI', 'NHOQUE', 'TALHARIM', 'CABELINHO'],
+
+            // Artes e Cultura
+            'INSTRUMENTOS MUSICAIS': ['VIOLÃO', 'PIANO', 'BATERIA', 'FLAUTA', 'VIOLINO', 'TROMPETE', 'SAXOFONE', 'TECLADO', 'BAIXO', 'HARPA'],
+            'GÊNEROS MUSICAIS': ['SAMBA', 'ROCK', 'POP', 'JAZZ', 'SERTANEJO', 'FUNK', 'CLÁSSICA', 'ELETRÔNICA', 'REGGAE', 'BLUES'],
+            'GÊNEROS LITERÁRIOS': ['ROMANCE', 'FICÇÃO', 'FANTASIA', 'POESIA', 'CONTO', 'CRÔNICA', 'BIOGRAFIA', 'SUSPENSE', 'AVENTURA', 'TERROR'],
+            'MOVIMENTOS ARTÍSTICOS': ['RENASCIMENTO', 'BARROCO', 'IMPRESSIONISMO', 'CUBISMO', 'SURREALISMO', 'MODERNISMO', 'EXPRESSIONISMO'],
+            'TIPOS DE DANÇA': ['SAMBA', 'TANGO', 'BALÉ', 'VALSA', 'SALSA', 'FLAMENCO', 'FORRÓ', 'HIP-HOP'],
+            'HERÓIS DA MARVEL': ['THOR', 'HULK', 'HOMEM DE FERRO', 'CAPITÃO AMÉRICA', 'VIÚVA NEGRA', 'HOMEM-ARANHA', 'PANTERA NEGRA', 'DOUTOR ESTRANHO'],
+            'PERSONAGENS DE HARRY POTTER': ['HARRY', 'RONY', 'HERMIONE', 'DUMBLEDORE', 'VOLDEMORT', 'SNAPE', 'HAGRID', 'DRACO'],
+            'ESTILOS ARQUITETÔNICOS': ['GÓTICO', 'CLÁSSICO', 'MODERNO', 'BARROCO', 'ART DÉCO', 'ROMÂNICO', 'CONTEMPORÂNEO'],
+            'PEÇAS DE SHAKESPEARE': ['HAMLET', 'ROMEU E JULIETA', 'MACBETH', 'OTELO', 'SONHO', 'A MEGERA DOMADA', 'O REI LEAR'],
+            'PINTORES FAMOSOS': ['DA VINCI', 'PICASSO', 'VAN GOGH', 'MONET', 'REMBRANDT', 'DALI', 'MICHELANGELO'],
+            'DIRETORES DE CINEMA': ['SPIELBERG', 'TARANTINO', 'HITCHCOCK', 'KUBRICK', 'SCORSESE', 'COPPOLA', 'CAMERON'],
+
+            // Ciência e Conhecimento
+            'FIGURAS GEOMÉTRICAS': ['CÍRCULO', 'QUADRADO', 'TRIÂNGULO', 'RETÂNGULO', 'LOSANGO', 'TRAPÉZIO', 'PENTÁGONO', 'HEXÁGONO', 'CUBO', 'ESFERA'],
+            'SINAIS DE PONTUAÇÃO': ['PONTO', 'VÍRGULA', 'TRAVESSÃO', 'ASPAS', 'EXCLAMAÇÃO', 'INTERROGAÇÃO', 'PARÊNTESES', 'COLCHETES', 'RETICÊNCIAS'],
+            'CONTINENTES': ['ÁSIA', 'ÁFRICA', 'EUROPA', 'AMÉRICA', 'OCEANIA', 'ANTÁRTIDA'],
+            'ASTROS': ['SOL', 'LUA', 'ESTRELA', 'COMETA', 'PLANETA', 'GALÁXIA', 'METEORO', 'ASTEROIDE', 'NEBULOSA', 'SATÉLITE'],
+            'OSSOS DO CORPO': ['FÊMUR', 'TÍBIA', 'CRÂNIO', 'ÚMERO', 'RÁDIO', 'VÉRTEBRA', 'COSTELA', 'FÍBULA', 'CLAVÍCULA', 'PÉLVIS'],
+            'ELEMENTOS DA TABELA PERIÓDICA': ['HIDROGÊNIO', 'HÉLIO', 'OXIGÊNIO', 'CARBONO', 'FERRO', 'OURO', 'PRATA', 'SÓDIO', 'CÁLCIO', 'URÂNIO'],
+            'TERMOS DE ECONOMIA': ['INFLAÇÃO', 'JUROS', 'CÂMBIO', 'DÉFICIT', 'PIB', 'AÇÃO', 'OFERTA', 'DEMANDA', 'LUCRO', 'IMPOSTO'],
+            'PARTES DO CORPO': ['CABEÇA', 'BRAÇO', 'PERNA', 'PÉ', 'MÃO', 'OLHO', 'BOCA', 'NARIZ', 'ORELHA', 'DEDO'],
+            'UNIDADES DE MEDIDA': ['METRO', 'LITRO', 'QUILO', 'SEGUNDO', 'WATT', 'VOLT', 'JOULE', 'PASCAL'],
+            'OCEANOS': ['ATLÂNTICO', 'PACÍFICO', 'ÍNDICO', 'ÁRTICO', 'ANTÁRTICO'],
+            'CONSTELAÇÕES': ['ÓRION', 'URSA MAIOR', 'CRUZEIRO DO SUL', 'ESCORPIÃO', 'PÉGASO', 'ANDRÔMEDA', 'CÃO MAIOR'],
+            'LINGUAGENS DE PROGRAMAÇÃO': ['PYTHON', 'JAVA', 'JAVASCRIPT', 'C++', 'RUBY', 'SWIFT', 'GO', 'PHP'],
+            'PEDRAS PRECIOSAS': ['DIAMANTE', 'RUBI', 'ESMERALDA', 'SAFIRA', 'AMETISTA', 'TOPÁZIO', 'OPALA', 'TURQUESA'],
+            'CORPOS D\'ÁUA': ['RIO', 'LAGO', 'MAR', 'OCEANO', 'RIACHO', 'LAGOA', 'REPRESA', 'CÓRREGO'],
+
+            // Pessoas e Sociedade
+            'PROFISSÕES': ['MÉDICO', 'PROFESSOR', 'BOMBEIRO', 'ATOR', 'ENGENHEIRO', 'ADVOGADO', 'JUIZ', 'DENTISTA', 'JORNALISTA', 'COZINHEIRO'],
+            'SENTIMENTOS': ['ALEGRIA', 'TRISTEZA', 'RAIVA', 'MEDO', 'AMOR', 'SURPRESA', 'NOJO', 'VERGONHA', 'ORGULHO', 'ANSIEDADE'],
+            'REDES SOCIAIS': ['FACEBOOK', 'INSTAGRAM', 'TIKTOK', 'TWITTER', 'LINKEDIN', 'PINTEREST', 'SNAPCHAT', 'WHATSAPP', 'TELEGRAM', 'REDDIT'],
+            'CAPITAIS EUROPEIAS': ['PARIS', 'LONDRES', 'ROMA', 'MADRI', 'BERLIM', 'LISBOA', 'ATENAS', 'DUBLIN', 'OSLO', 'VIENA'],
+            'SÍMBOLOS DO ZODÍACO': ['ÁRIES', 'TOURO', 'GÊMEOS', 'CÂNCER', 'LEÃO', 'VIRGEM', 'LIBRA', 'ESCORPIÃO', 'SAGITÁRIO', 'PEIXES'],
+            'CARGOS POLÍTICOS': ['PRESIDENTE', 'SENADOR', 'DEPUTADO', 'PREFEITO', 'VEREADOR', 'GOVERNADOR', 'MINISTRO'],
+            'CRIATURAS MÍTICAS': ['DRAGÃO', 'GRIFO', 'FÊNIX', 'UNICÓRNIO', 'SEREIA', 'CENTAURO', 'MINOTAURO', 'CICLOPE'],
+            'DEUSES EGÍPCIOS': ['RÁ', 'ANÚBIS', 'HÓRUS', 'ÍSIS', 'OSÍRIS', 'SET', 'THOTH', 'BASTET'],
+            'PAÍSES DA AMÉRICA DO SUL': ['BRASIL', 'ARGENTINA', 'CHILE', 'COLÔMBIA', 'PERU', 'VENEZUELA', 'EQUADOR', 'URUGUAI'],
+
+            // Lazer e Esportes
+            'TERMOS DE XADREZ': ['REI', 'RAINHA', 'TORRE', 'BISPO', 'CAVALO', 'PEÃO', 'XEQUE', 'ROQUE', 'EMPATE', 'GAMBITO'],
+            'ESPORTES COM BOLA': ['FUTEBOL', 'BASQUETE', 'VÔLEI', 'TÊNIS', 'HANDEBOL', 'GOLFE', 'BEISEBOL', 'RUGBY', 'POLO', 'CRÍQUETE'],
+            'NAIPES DO BARALHO': ['COPAS', 'ESPADAS', 'OUROS', 'PAUS'],
+            'ESPORTES OLÍMPICOS': ['NATAÇÃO', 'ATLETISMO', 'GINÁSTICA', 'JUDÔ', 'VÔLEI', 'BASQUETE', 'ESGRIMA', 'REMO'],
+            'JOGOS DE TABULEIRO': ['XADREZ', 'DAMA', 'LUDO', 'MONOPOLY', 'WAR', 'DETETIVE', 'RISK', 'CATAN'],
+            'TERMOS DE POKER': ['BLUFF', 'ALL-IN', 'FLOP', 'TURN', 'RIVER', 'TRINCA', 'FLUSH', 'STRAIGHT'],
+
+            // Veículos e Marcas
+            'MEIOS DE TRANSPORTE': ['CARRO', 'AVIÃO', 'NAVIO', 'TREM', 'ÔNIBUS', 'BICICLETA', 'MOTO', 'METRÔ', 'BARCO', 'HELICÓPTERO'],
+            'MARCAS DE CARRO': ['FIAT', 'FORD', 'HONDA', 'TOYOTA', 'CHEVROLET', 'VOLKSWAGEN', 'HYUNDAI', 'RENAULT', 'BMW', 'NISSAN'],
+            'MARCAS DE TECNOLOGIA': ['APPLE', 'SAMSUNG', 'GOOGLE', 'MICROSOFT', 'AMAZON', 'DELL', 'HP', 'SONY'],
+            'MARCAS ESPORTIVAS': ['NIKE', 'ADIDAS', 'PUMA', 'REEBOK', 'ASICS', 'MIZUNO', 'FILA', 'TOPPER'],
+            'COMPANHIAS AÉREAS': ['LATAM', 'GOL', 'AZUL', 'EMIRATES', 'LUFTHANSA', 'DELTA', 'TAP', 'AMERICAN'],
+            'MARCAS DE LUXO': ['GUCCI', 'PRADA', 'LOUIS VUITTON', 'ROLEX', 'CHANEL', 'DIOR', 'FERRARI', 'VERSACE'],
+
+            // Estações e Tempo
+            'ESTAÇÕES DO ANO': ['VERÃO', 'INVERNO', 'OUTONO', 'PRIMAVERA'],
+            'MESES DO ANO': ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'DEZEMBRO'],
+            'DIAS DA SEMANA': ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO', 'DOMINGO']
+        };
+
+        // Elementos da UI
+        const gameGrid = document.getElementById('game-grid');
+        const deselectBtn = document.getElementById('deselect-btn');
+        const resetStatsBtn = document.getElementById('reset-stats-btn');
+        const mistakesLeftSpan = document.getElementById('mistakes-left');
+        const statsPlayedEl = document.getElementById('stats-played');
+        const statsWonEl = document.getElementById('stats-won');
+        const statsLossesEl = document.getElementById('stats-losses'); // Novo elemento
+        const statsRateEl = document.getElementById('stats-rate');
+        const foundGroupsContainer = document.getElementById('found-groups');
+        const gameContainer = document.getElementById('game-container');
+        const overlay = document.getElementById('overlay');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalResults = document.getElementById('modal-results');
+        const playAgainBtn = document.getElementById('play-again-btn');
+
+        // Estado do Jogo
+        let selectedWords = [];
+        let mistakesLeft = 10;
+        let groupsFound = 0;
+        let currentPuzzle;
+        let isChecking = false;
+        let isGameOver = false;
+        let stats = {};
+        let categoryQueue = [];
+
+        // --- LÓGICA DE ESTATÍSTICAS E FILA ---
+        function loadStats() {
+            const savedStats = localStorage.getItem('elosEternosStats');
+            stats = savedStats ? JSON.parse(savedStats) : { gamesPlayed: 0, gamesWon: 0 };
+            displayStats();
+        }
+
+        function saveStats() {
+            localStorage.setItem('elosEternosStats', JSON.stringify(stats));
+        }
+
+        function displayStats() {
+            const losses = stats.gamesPlayed - stats.gamesWon;
+            const winRate = stats.gamesPlayed > 0 ? ((stats.gamesWon / stats.gamesPlayed) * 100).toFixed(0) : 0;
+            statsPlayedEl.textContent = stats.gamesPlayed;
+            statsWonEl.textContent = stats.gamesWon;
+            statsLossesEl.textContent = losses; // Atualiza derrotas
+            statsRateEl.textContent = `${winRate}%`;
+        }
+
+        function resetStats() {
+            if (confirm('Você tem certeza que quer apagar suas estatísticas e o histórico de categorias?')) {
+                stats = { gamesPlayed: 0, gamesWon: 0 };
+                localStorage.removeItem('elosEternosStats');
+                localStorage.removeItem('elosEternosQueue');
+                saveStats();
+                displayStats();
+                initializeCategoryQueue();
+            }
+        }
+
+        function initializeCategoryQueue() {
+            const savedQueueData = localStorage.getItem('elosEternosQueue');
+            const currentBankKeys = Object.keys(wordBank);
+            const currentBankSize = currentBankKeys.length;
+            let queueData = savedQueueData ? JSON.parse(savedQueueData) : null;
+            if (!queueData || queueData.bankSize !== currentBankSize) {
+                categoryQueue = shuffleArray(currentBankKeys.filter(cat => wordBank[cat].length >= 4));
+                saveCategoryQueue();
+            } else {
+                categoryQueue = queueData.queue;
+            }
+        }
+        
+        function saveCategoryQueue() {
+            const queueData = { queue: categoryQueue, bankSize: Object.keys(wordBank).length };
+            localStorage.setItem('elosEternosQueue', JSON.stringify(queueData));
+        }
+
+        // --- LÓGICA DO JOGO ---
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function generateDynamicPuzzle() {
+            if (categoryQueue.length < 4) initializeCategoryQueue();
+            const chosenCategories = categoryQueue.splice(0, 4);
+            categoryQueue.push(...chosenCategories);
+            saveCategoryQueue();
+            const groups = chosenCategories.map((category, index) => {
+                const words = shuffleArray([...wordBank[category]]).slice(0, 4);
+                return { category, words, level: index + 1 };
+            });
+            return { groups };
+        }
+
+        function initGame() {
+            selectedWords = []; mistakesLeft = 10; groupsFound = 0;
+            isChecking = false; isGameOver = false;
+            currentPuzzle = generateDynamicPuzzle();
+            gameGrid.innerHTML = ''; foundGroupsContainer.innerHTML = '';
+            mistakesLeftSpan.textContent = mistakesLeft;
+            overlay.classList.remove('show');
+            const allWords = currentPuzzle.groups.flatMap(g => g.words);
+            shuffleArray(allWords).forEach(word => {
+                const btn = document.createElement('button');
+                btn.className = 'word-btn';
+                btn.textContent = word;
+                btn.addEventListener('click', () => handleWordClick(btn));
+                gameGrid.appendChild(btn);
+            });
+        }
+
+        function handleWordClick(btn) {
+            if (btn.classList.contains('guessed') || isChecking || isGameOver) return;
+            const word = btn.textContent;
+            const index = selectedWords.indexOf(word);
+            if (index > -1) {
+                selectedWords.splice(index, 1);
+                btn.classList.remove('selected');
+            } else if (selectedWords.length < 4) {
+                selectedWords.push(word);
+                btn.classList.add('selected');
+                if (selectedWords.length === 4) {
+                    isChecking = true;
+                    setTimeout(handleSubmit, 200);
+                }
+            }
+        }
+
+        function deselectAll() {
+            selectedWords = [];
+            document.querySelectorAll('.word-btn.selected').forEach(btn => btn.classList.remove('selected'));
+        }
+
+        function handleSubmit() {
+            const correctGroup = currentPuzzle.groups.find(g => g.words.every(w => selectedWords.includes(w)));
+            if (correctGroup) processCorrectGuess(correctGroup); else processIncorrectGuess();
+        }
+
+        function processCorrectGuess(group) {
+            groupsFound++;
+            const groupDiv = document.createElement('div');
+            groupDiv.className = `found-group level-${group.level}`;
+            groupDiv.innerHTML = `<strong>${group.category}</strong> ${group.words.join(', ')}`;
+            const existingGroups = Array.from(foundGroupsContainer.children);
+            const nextGroup = existingGroups.find(g => parseInt(g.className.match(/level-(\d+)/)[1]) > group.level);
+            foundGroupsContainer.insertBefore(groupDiv, nextGroup);
+            document.querySelectorAll('.word-btn.selected').forEach(btn => btn.classList.add('guessed'));
+            deselectAll();
+            setTimeout(() => {
+                reorganizeGrid();
+                isChecking = false;
+            }, 600);
+            if (groupsFound === 4) {
+                endGame(true);
+            }
+        }
+
+        function reorganizeGrid() {
+            const allButtons = Array.from(gameGrid.children);
+            allButtons.sort((a, b) => a.classList.contains('guessed') ? 1 : -1);
+            allButtons.forEach(button => gameGrid.appendChild(button));
+        }
+
+        function processIncorrectGuess() {
+            mistakesLeft--;
+            mistakesLeftSpan.textContent = mistakesLeft;
+            gameContainer.classList.add('shake');
+            setTimeout(() => {
+                gameContainer.classList.remove('shake');
+                deselectAll();
+                isChecking = false;
+            }, 500);
+            if (mistakesLeft === 0) {
+                endGame(false);
+            }
+        }
+
+        function endGame(isVictory) {
+            if (isGameOver) return;
+            isGameOver = true;
+
+            stats.gamesPlayed++;
+            if (isVictory) {
+                stats.gamesWon++;
+            }
+            saveStats();
+            displayStats();
+
+            const title = isVictory ? 'Você Venceu!' : 'Fim de Jogo';
+            const message = isVictory ? 'Parabéns!' : 'Aqui estão as respostas:';
+            setTimeout(() => showModal(title, message, currentPuzzle.groups), 500);
+        }
+
+        function showModal(title, message, finalGroups) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modalResults.innerHTML = '';
+            const sortedGroups = finalGroups.sort((a, b) => a.level - b.level);
+            sortedGroups.forEach(group => {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = `found-group level-${group.level}`;
+                groupDiv.style.opacity = 1;
+                groupDiv.style.transform = 'none';
+                groupDiv.innerHTML = `<strong>${group.category}</strong> ${group.words.join(', ')}`;
+                modalResults.appendChild(groupDiv);
+            });
+            overlay.classList.add('show');
+        }
+
+        // --- INICIALIZAÇÃO ---
+        deselectBtn.addEventListener('click', deselectAll);
+        resetStatsBtn.addEventListener('click', resetStats);
+        playAgainBtn.addEventListener('click', initGame);
+
+        loadStats();
+        initializeCategoryQueue();
+        initGame();
+    </script>
+</body>
+</html>
